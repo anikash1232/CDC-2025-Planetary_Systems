@@ -8,6 +8,9 @@ Transform NASA's Exoplanet Archive into personalized fitness training programs. 
 - **Backend**: FastAPI + Python
 - **API**: RESTful endpoints for gravity calculations and workout planning
 
+## Data Processing Documents:
+- https://drive.google.com/drive/folders/1EPAfy_xG9MTjEZ5JOqbi9xrAnNF_E401
+
 ## Features
 
 - **Planetary Gravity Calculations**: Compute g_fraction and intensity index using NASA exoplanet data
