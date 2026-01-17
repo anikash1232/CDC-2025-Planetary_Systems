@@ -1,4 +1,4 @@
-# GravityFit Exo
+# GravityFit 
 
 Transform NASA's Exoplanet Archive into personalized fitness training programs. Select any exoplanet and get gravity-scaled workouts designed for that world's conditions.
 
