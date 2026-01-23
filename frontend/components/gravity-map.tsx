@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -20,14 +20,14 @@ import {
   PieChart,
   Pie,
 } from "recharts"
-import { Map, Filter, BarChart3, PieChartIcon, ScanTextIcon as ScatterIcon, Info, Zap, Target } from "lucide-react"
+import { Map, Filter, BarChart3, PieChartIcon, ScanTextIcon as ScatterIcon, Info, Zap, Target, Loader2 } from "lucide-react"
 import {
-  mockExoplanets,
   calculateGravityFraction,
   calculateIntensityIndex,
   getIntensityTier,
   type Exoplanet,
 } from "@/lib/exoplanet-data"
+import { api } from "@/lib/api"
 
 interface GravityMapProps {
   onPlanetSelect?: (planet: Exoplanet) => void
@@ -38,10 +38,46 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
   const [filterTier, setFilterTier] = useState<"all" | "low" | "medium" | "high">("all")
   const [distanceRange, setDistanceRange] = useState([0, 1500])
   const [selectedPlanet, setSelectedPlanet] = useState<Exoplanet | null>(null)
+  const [planets, setPlanets] = useState<Exoplanet[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Load planets on mount
+  useEffect(() => {
+    const loadPlanets = async () => {
+      try {
+        setLoading(true)
+        const data = await api.getRandomExoplanets(200)
+        
+        // Convert API data to frontend format with calculated fields
+        const convertedPlanets = data.map((planet: any) => ({
+          id: planet.pl_name.toLowerCase().replace(/\s+/g, '-'),
+          name: planet.pl_name,
+          hostStar: planet.hostname,
+          mass: planet.pl_bmasse,
+          radius: planet.pl_rade,
+          gravity: planet.g_fraction * 9.81, // Convert to m/s²
+          distance: planet.sy_dist ? planet.sy_dist * 3.26 : 0, // Convert parsecs to light years
+          discoveryYear: 2020, // Default since not in CSV
+          temperature: planet.pl_eqt,
+          orbitalPeriod: planet.pl_orbper,
+          g_fraction: planet.g_fraction,
+          intensity_index: planet.intensity_index,
+        }))
+        
+        setPlanets(convertedPlanets)
+      } catch (error) {
+        console.error('Error loading planets for gravity map:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadPlanets()
+  }, [])
 
   // Process data for visualization
   const processedData = useMemo(() => {
-    return mockExoplanets
+    return planets
       .filter((planet) => planet.gravity) // Only planets with gravity data
       .map((planet) => {
         const gravityFraction = calculateGravityFraction(planet.gravity!)
@@ -63,7 +99,7 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
         const distanceMatch = planet.distance >= distanceRange[0] && planet.distance <= distanceRange[1]
         return tierMatch && distanceMatch
       })
-  }, [filterTier, distanceRange])
+  }, [planets, filterTier, distanceRange])
 
   // Data for different chart types
   const scatterData = processedData.map((planet) => ({
@@ -125,6 +161,17 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
 
   return (
     <div className="space-y-6">
+      {loading ? (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">Loading exoplanet data...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
       {/* Header */}
       <Card className="bg-gradient-to-r from-primary/10 to-accent/10 border-primary/20">
         <CardHeader>
@@ -403,6 +450,8 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   )
