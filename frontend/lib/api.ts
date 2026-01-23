@@ -12,7 +12,11 @@ import {
 
 // In production, we use static data only. No backend API is deployed.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || ''
-const USE_STATIC_DATA = !API_BASE || process.env.NODE_ENV === 'production'
+
+// Check if we should use static data (no API base configured)
+function useStaticData(): boolean {
+  return !API_BASE || API_BASE === ''
+}
 
 // Types matching the backend API
 export interface PredictRequest {
@@ -180,7 +184,7 @@ export const api = {
    * Search exoplanets
    */
   async searchExoplanets(query: string = '', limit: number = 20): Promise<ExoplanetSearchResponse> {
-    if (USE_STATIC_DATA) {
+    if (useStaticData()) {
       const staticPlanets = searchStaticPlanets(query, limit)
       return {
         exoplanets: staticPlanets as Exoplanet[],
@@ -214,7 +218,7 @@ export const api = {
    * Get exoplanet dataset statistics
    */
   async getExoplanetStats(): Promise<ExoplanetStatsResponse> {
-    if (USE_STATIC_DATA) {
+    if (useStaticData()) {
       return STATIC_STATS as ExoplanetStatsResponse
     }
     
@@ -226,14 +230,14 @@ export const api = {
     }
   },
 
-  /*if (USE_STATIC_DATA) {
-      return getRandomStaticPlanets(limit) as Exoplanet[]
-    }
-    
-    *
+  /**
    * Get random exoplanets
    */
   async getRandomExoplanets(limit: number = 5): Promise<Exoplanet[]> {
+    if (useStaticData()) {
+      return getRandomStaticPlanets(limit) as Exoplanet[]
+    }
+    
     try {
       const params = new URLSearchParams({ limit: limit.toString() })
       return await fetchApi<Exoplanet[]>(`/exoplanets/random?${params}`)
