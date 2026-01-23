@@ -7,7 +7,7 @@ import { Suspense } from "react"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "GravityFit Exo - Exoplanet Fitness Training",
+  title: "GravityFit - Exoplanet Fitness Training",
   description: "Transform NASA's Exoplanet Archive into personalized gravity-based workout programs",
   generator: "v0.app",
 }

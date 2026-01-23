@@ -12,7 +12,7 @@ export function Header() {
               <Dumbbell className="h-4 w-4 text-accent absolute -bottom-1 -right-1" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">GravityFit Exo</h1>
+              <h1 className="text-xl font-bold text-foreground">GravityFit</h1>
               <p className="text-xs text-muted-foreground">Exoplanet Fitness Training</p>
             </div>
           </div>

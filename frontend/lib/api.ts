@@ -1,5 +1,5 @@
 /**
- * Typed API client for GravityFit Exo backend
+ * Typed API client for GravityFit backend
  */
 
 import { 
