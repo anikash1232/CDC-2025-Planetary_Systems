@@ -16,7 +16,16 @@ import {
 import { searchExoplanets as searchExoplanetsAPI, getRandomExoplanets, getExoplanetStats } from "@/lib/exoplanet-service"
 import { ExoplanetStatsResponse, api } from "@/lib/api"
 
-export function PlanetSearch() {
+interface PlanetSearchProps {
+  /**
+   * Bumped by the page when the header's "Planet Search" is clicked, so an open
+   * workout closes and the planet list comes back. Kept separate from the
+   * loaded planets and the query so neither is thrown away.
+   */
+  resetToken?: number
+}
+
+export function PlanetSearch({ resetToken = 0 }: PlanetSearchProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedPlanet, setSelectedPlanet] = useState<Exoplanet | null>(null)
   const [showWorkout, setShowWorkout] = useState(false)
@@ -146,6 +155,12 @@ export function PlanetSearch() {
     setShowWorkout(false)
     setSelectedPlanet(null)
   }
+
+  useEffect(() => {
+    if (resetToken === 0) return
+    setShowWorkout(false)
+    setSelectedPlanet(null)
+  }, [resetToken])
 
   if (showWorkout && selectedPlanet) {
     return <WorkoutGenerator planet={selectedPlanet} onBack={handleBackToSearch} />
