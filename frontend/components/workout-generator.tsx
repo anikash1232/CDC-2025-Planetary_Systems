@@ -18,13 +18,13 @@ import {
   Settings,
   TrendingUp,
   Play,
-  Loader2,
 } from "lucide-react"
 import { SessionDisplay } from "@/components/session-display"
 import { WorkoutSummary } from "@/components/workout-summary"
 import { calculateWorkoutSession, generateWeeklySchedule } from "@/lib/workout-calculator"
 import { calculateGravityFraction, calculateIntensityIndex, type Exoplanet } from "@/lib/exoplanet-data"
-import { api, type WeeklyPlan, type PredictResponse, ApiError } from "@/lib/api"
+import { api, type WeeklyPlan } from "@/lib/api"
+import { generateWorkoutPlan } from "@/lib/gravity-fitness"
 
 interface WorkoutGeneratorProps {
   planet: Exoplanet
@@ -36,55 +36,47 @@ export function WorkoutGenerator({ planet, onBack }: WorkoutGeneratorProps) {
   const [showLiveSession, setShowLiveSession] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
   const [sessionStats, setSessionStats] = useState({ completedExercises: 0, totalTime: 0 })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [backendData, setBackendData] = useState<{
-    intensityIndex: number
-    weeklyPlan: WeeklyPlan | null
-  } | null>(null)
+  // Prefer the catalogue's own values so this screen always agrees with the
+  // number shown on the planet card; only derive them if a planet lacks them.
+  const gravityFraction = planet.g_fraction ?? (planet.gravity ? calculateGravityFraction(planet.gravity) : 1)
+  const seedIntensityIndex = planet.intensity_index ?? calculateIntensityIndex(gravityFraction)
+  // The API contract clamps g_fraction to [0,1], matching the catalogue values.
+  const gFractionForApi = Math.max(0, Math.min(1, gravityFraction))
 
-  const gravityFraction = planet.gravity ? calculateGravityFraction(planet.gravity) : 1
-  const intensityIndex = backendData?.intensityIndex ?? calculateIntensityIndex(gravityFraction)
+  // Seeded synchronously so the plan renders instantly; the API response below
+  // replaces it. Both come from the same generator, so there is no visible shift.
+  const [plan, setPlan] = useState<WeeklyPlan>(() => generateWorkoutPlan(seedIntensityIndex, gFractionForApi))
+  const intensityIndex = plan.intensity_index
 
-  // Fetch data from backend on component mount
   useEffect(() => {
-    const fetchBackendData = async () => {
-      if (!planet.gravity) return
-      
-      setLoading(true)
-      setError(null)
-      
+    let cancelled = false
+
+    const loadPlan = async () => {
+      setPlan(generateWorkoutPlan(seedIntensityIndex, gFractionForApi))
+
+      // api.predict/api.plan fall back to local computation on failure, so a
+      // rejection here is unexpected rather than routine.
       try {
-        // Calculate g_fraction from planet data
-        const gFraction = Math.max(0, Math.min(1, (planet.mass || 1) / ((planet.radius || 1) ** 2)))
-        
-        // Get intensity index from backend
         const predictResponse = await api.predict({
-          g_fraction: gFraction,
+          g_fraction: gFractionForApi,
           alpha: 1.0,
-          mapping: "linear"
+          mapping: "linear",
         })
-        
-        // Get workout plan from backend
         const weeklyPlan = await api.plan({
           intensity_index: predictResponse.intensity_index,
-          g_fraction: gFraction
+          g_fraction: gFractionForApi,
         })
-        
-        setBackendData({
-          intensityIndex: predictResponse.intensity_index,
-          weeklyPlan
-        })
+        if (!cancelled) setPlan(weeklyPlan)
       } catch (err) {
-        console.error('Failed to fetch backend data:', err)
-        setError(err instanceof ApiError ? err.message : 'Failed to load workout data')
-      } finally {
-        setLoading(false)
+        console.error("Failed to build workout plan:", err)
       }
     }
 
-    fetchBackendData()
-  }, [planet])
+    loadPlan()
+    return () => {
+      cancelled = true
+    }
+  }, [planet.id, gFractionForApi, seedIntensityIndex])
 
   const workoutSession = calculateWorkoutSession(planet.name, gravityFraction, intensityIndex)
   const weeklySchedule = generateWeeklySchedule(planet.name, gravityFraction, intensityIndex)
@@ -145,70 +137,9 @@ export function WorkoutGenerator({ planet, onBack }: WorkoutGeneratorProps) {
           session={workoutSession}
           completedExercises={sessionStats.completedExercises}
           totalTime={sessionStats.totalTime}
+          planet={planet}
           onRestart={handleBackToOverview}
-          onShare={() => console.log("Share functionality")}
-          onExport={() => console.log("Export functionality")}
         />
-      </div>
-    )
-  }
-
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack} size="sm">
-            ← Back to Planet Search
-          </Button>
-          <div className="text-right">
-            <h2 className="text-2xl font-bold text-balance">{planet.name}</h2>
-            <p className="text-sm text-muted-foreground">Gravity-Optimized Training Program</p>
-          </div>
-        </div>
-        <Card className="bg-gradient-to-r from-card/80 to-card/60 backdrop-blur-sm border-primary/20">
-          <CardContent className="flex items-center justify-center py-12">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <p className="text-muted-foreground">Calculating gravity-optimized workout...</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Show error state
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack} size="sm">
-            ← Back to Planet Search
-          </Button>
-          <div className="text-right">
-            <h2 className="text-2xl font-bold text-balance">{planet.name}</h2>
-            <p className="text-sm text-muted-foreground">Gravity-Optimized Training Program</p>
-          </div>
-        </div>
-        <Card className="border-destructive/20 bg-destructive/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Error Loading Workout Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button 
-              onClick={() => window.location.reload()} 
-              variant="outline" 
-              size="sm"
-            >
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     )
   }
@@ -386,20 +317,14 @@ export function WorkoutGenerator({ planet, onBack }: WorkoutGeneratorProps) {
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
                 7-Day Training Schedule
-                {backendData?.weeklyPlan && (
-                  <Badge variant="outline" className="ml-2">
-                    Backend Generated
-                  </Badge>
-                )}
               </CardTitle>
               <CardDescription>
-                Total weekly volume: {backendData?.weeklyPlan?.total_weekly_volume ?? weeklySchedule.totalWeeklyVolume} minutes across {backendData?.weeklyPlan?.sessions.length ?? weeklySchedule.sessions.length}{" "}
-                sessions
+                Total weekly volume: {plan.total_weekly_volume} minutes across {plan.sessions.length} sessions
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(backendData?.weeklyPlan?.sessions ?? weeklySchedule.sessions).map((session, index) => (
+                {plan.sessions.map((session, index) => (
                   <div key={index} className="border border-border/50 rounded-lg p-4 bg-card/20">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold">{session.name}</h4>
@@ -409,9 +334,9 @@ export function WorkoutGenerator({ planet, onBack }: WorkoutGeneratorProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Intensity: {session.intensityIndex || intensityIndex}/10</span>
+                      <span>Intensity: {intensityIndex}/10</span>
                       <span>Exercises: {session.exercises.length}</span>
-                      <span>Gravity: {session.gravityFraction?.toFixed(2) ?? gravityFraction.toFixed(2)}x</span>
+                      <span>Gravity: {gravityFraction.toFixed(2)}x</span>
                     </div>
                     <Progress value={(session.duration / 60) * 100} className="mt-2 h-2" />
                   </div>
@@ -430,7 +355,10 @@ export function WorkoutGenerator({ planet, onBack }: WorkoutGeneratorProps) {
             </CardHeader>
             <CardContent>
               <ul className="space-y-2">
-                {(backendData?.weeklyPlan?.safety_notes ?? weeklySchedule.recoveryRecommendations).map((rec, index) => (
+                {(plan.safety_notes.length > 0
+                  ? plan.safety_notes
+                  : weeklySchedule.recoveryRecommendations
+                ).map((rec, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
                     {rec}
@@ -448,24 +376,22 @@ export function WorkoutGenerator({ planet, onBack }: WorkoutGeneratorProps) {
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
                 Equipment Set-Points
-                {backendData?.weeklyPlan && (
-                  <Badge variant="outline" className="ml-2">
-                    Backend Generated
-                  </Badge>
-                )}
               </CardTitle>
-              <CardDescription>Recommended device configurations for {planet.name} gravity conditions</CardDescription>
+              <CardDescription>
+                Set-points for today&apos;s session on {planet.name}, scaled to its gravity conditions
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {(backendData?.weeklyPlan?.device_setpoints ?? workoutSession.exercises
+                {workoutSession.exercises
                   .filter((ex) => ex.deviceSetPoint)
                   .map((ex) => ({
                     exercise: ex.name,
                     setpoint: ex.deviceSetPoint!,
                     base_load: ex.baseLoad,
-                    scaled_load: ex.scaledLoad
-                  }))).map((item, index) => (
+                    scaled_load: ex.scaledLoad,
+                  }))
+                  .map((item, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-card/30 rounded-lg">
                       <div className="flex items-center gap-3">
                         {getExerciseTypeIcon("strength")}

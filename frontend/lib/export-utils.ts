@@ -182,7 +182,7 @@ export function exportToCSV(
   csvData.push(`Surface Gravity (m/s²),${planet.gravity?.toFixed(1) || "Unknown"}`)
   csvData.push(`Gravity Ratio (vs Earth),${session.gravityFraction.toFixed(2)}`)
   csvData.push(`Intensity Index,${session.intensityIndex}/10`)
-  csvData.push(`Discovery Year,${planet.discoveryYear}`)
+  csvData.push(`Discovery Year,${planet.discoveryYear ?? "Unknown"}`)
   csvData.push(`Distance (light years),${planet.distance}`)
   csvData.push(`Temperature (K),${planet.temperature || "Unknown"}`)
   csvData.push("")

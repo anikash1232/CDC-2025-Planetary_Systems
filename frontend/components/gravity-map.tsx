@@ -57,7 +57,6 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
           radius: planet.pl_rade,
           gravity: planet.g_fraction * 9.81, // Convert to m/s²
           distance: planet.sy_dist ? planet.sy_dist * 3.26 : 0, // Convert parsecs to light years
-          discoveryYear: 2020, // Default since not in CSV
           temperature: planet.pl_eqt,
           orbitalPeriod: planet.pl_orbper,
           g_fraction: planet.g_fraction,
@@ -297,7 +296,7 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
         <CardContent>
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              {viewType === "scatter" && (
+              {viewType === "scatter" ? (
                 <ScatterChart data={scatterData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
@@ -326,9 +325,7 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
                     ))}
                   </Scatter>
                 </ScatterChart>
-              )}
-
-              {viewType === "bar" && (
+              ) : viewType === "bar" ? (
                 <BarChart data={barData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="tier" stroke="hsl(var(--foreground))" />
@@ -346,9 +343,7 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
                     ))}
                   </Bar>
                 </BarChart>
-              )}
-
-              {viewType === "pie" && (
+              ) : (
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -357,7 +352,9 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
                     outerRadius={120}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }: { name?: string; percent?: number }) =>
+                      `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+                    }
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -391,21 +388,21 @@ export function GravityMap({ onPlanetSelect }: GravityMapProps) {
               <div className="w-4 h-4 rounded-full bg-chart-5"></div>
               <div>
                 <div className="font-semibold text-chart-5">Low Intensity (1-3)</div>
-                <div className="text-sm text-muted-foreground">≤0.5x Earth gravity • Easier workouts</div>
+                <div className="text-sm text-muted-foreground">≥0.72x Earth gravity • Gravity does the work</div>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-chart-3/10 rounded-lg border border-chart-3/20">
               <div className="w-4 h-4 rounded-full bg-chart-3"></div>
               <div>
                 <div className="font-semibold text-chart-3">Medium Intensity (4-7)</div>
-                <div className="text-sm text-muted-foreground">0.5-1.5x Earth gravity • Standard training</div>
+                <div className="text-sm text-muted-foreground">0.28–0.72x Earth gravity • Standard training</div>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
               <div className="w-4 h-4 rounded-full bg-destructive"></div>
               <div>
                 <div className="font-semibold text-destructive">High Intensity (8-10)</div>
-                <div className="text-sm text-muted-foreground">≥1.5x Earth gravity • Extreme challenge</div>
+                <div className="text-sm text-muted-foreground">≤0.28x Earth gravity • Hardest workouts</div>
               </div>
             </div>
           </div>

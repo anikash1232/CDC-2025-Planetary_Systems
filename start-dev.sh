@@ -48,11 +48,11 @@ fi
 # Install dependencies if needed
 if [ ! -d "node_modules" ]; then
     echo "📦 Installing frontend dependencies..."
-    pnpm install
+    npm install
 fi
 
 # Start frontend
-pnpm dev &
+npm run dev &
 FRONTEND_PID=$!
 
 echo ""

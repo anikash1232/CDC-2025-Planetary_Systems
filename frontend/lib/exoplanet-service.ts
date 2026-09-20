@@ -14,7 +14,6 @@ export function convertApiExoplanet(apiPlanet: ApiExoplanet): Exoplanet {
     radius: apiPlanet.pl_rade,
     gravity: apiPlanet.g_fraction * 9.81, // Convert to m/s²
     distance: apiPlanet.sy_dist ? apiPlanet.sy_dist * 3.26 : 0, // Convert parsecs to light years
-    discoveryYear: 2020, // Default since not in CSV
     temperature: apiPlanet.pl_eqt,
     orbitalPeriod: apiPlanet.pl_orbper,
     g_fraction: apiPlanet.g_fraction,

@@ -2,20 +2,31 @@
  * Typed API client for GravityFit backend
  */
 
-import { 
-  getRandomStaticPlanets, 
-  searchStaticPlanets, 
+import {
+  getRandomStaticPlanets,
+  searchStaticPlanets,
   STATIC_STATS,
   type StaticExoplanet,
-  type StaticStats 
+  type StaticStats
 } from './static-data'
+import { calculateIntensityIndex, generateWorkoutPlan, intensityFormula, type Mapping } from './gravity-fitness'
 
-// In production, we use static data only. No backend API is deployed.
+// Unset by default: the exoplanet catalogue is served from static-data.ts and
+// predict/plan are served by this app's own route handlers under /api.
+// Set NEXT_PUBLIC_API_BASE to point at a running FastAPI backend instead.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || ''
 
 // Check if we should use static data (no API base configured)
 function useStaticData(): boolean {
   return !API_BASE || API_BASE === ''
+}
+
+/**
+ * The FastAPI backend serves /predict and /plan at its root; when no backend is
+ * configured we use this app's own route handlers, which live under /api.
+ */
+function computeEndpoint(path: 'predict' | 'plan'): string {
+  return useStaticData() ? `/api/${path}` : `/${path}`
 }
 
 // Types matching the backend API
@@ -123,33 +134,20 @@ class ApiError extends Error {
 }
 
 async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE}${endpoint}`
-  console.log('API call to:', url)
-  
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    })
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+    ...options,
+  })
 
-    console.log('API response status:', response.status)
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('API error:', response.status, errorText)
-      throw new ApiError(response.status, errorText)
-    }
-
-    const data = await response.json()
-    console.log('API response data:', data)
-    return data
-  } catch (error) {
-    console.warn('API call failed, this is expected in production without a deployed backend:', error)
-    throw error
+  if (!response.ok) {
+    // Keep the message short: a failing endpoint can return a whole HTML page.
+    throw new ApiError(response.status, `Request to ${endpoint} failed with ${response.status}`)
   }
+
+  return response.json()
 }
 
 export const api = {
@@ -161,23 +159,44 @@ export const api = {
   },
 
   /**
-   * Predict intensity index from gravity fraction
+   * Predict intensity index from gravity fraction.
+   * Falls back to computing it in-process so the UI never fails on a bad response.
    */
   async predict(request: PredictRequest): Promise<PredictResponse> {
-    return fetchApi<PredictResponse>('/predict', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    })
+    const { g_fraction, alpha = 1.0, mapping = 'linear' } = request
+    try {
+      return await fetchApi<PredictResponse>(computeEndpoint('predict'), {
+        method: 'POST',
+        body: JSON.stringify(request),
+      })
+    } catch (error) {
+      console.warn('predict endpoint unavailable, computing locally', error)
+      return {
+        intensity_index: calculateIntensityIndex(g_fraction, alpha, mapping as Mapping),
+        details: {
+          g_fraction,
+          alpha_used: alpha,
+          mapping,
+          formula: intensityFormula(mapping as Mapping, alpha),
+        },
+      }
+    }
   },
 
   /**
-   * Generate workout plan from intensity index
+   * Generate workout plan from intensity index.
+   * Falls back to the same generator the route handler uses.
    */
   async plan(request: PlanRequest): Promise<WeeklyPlan> {
-    return fetchApi<WeeklyPlan>('/plan', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    })
+    try {
+      return await fetchApi<WeeklyPlan>(computeEndpoint('plan'), {
+        method: 'POST',
+        body: JSON.stringify(request),
+      })
+    } catch (error) {
+      console.warn('plan endpoint unavailable, computing locally', error)
+      return generateWorkoutPlan(request.intensity_index, request.g_fraction)
+    }
   },
 
   /**
