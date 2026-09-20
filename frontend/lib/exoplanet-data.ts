@@ -1,3 +1,5 @@
+import { calculateIntensityIndex as canonicalIntensityIndex } from "./gravity-fitness"
+
 export interface Exoplanet {
   id: string
   name: string
@@ -6,7 +8,7 @@ export interface Exoplanet {
   radius?: number // Earth radii
   gravity?: number // m/s²
   distance: number // light years
-  discoveryYear: number
+  discoveryYear?: number // not present in the NASA export we ship
   temperature?: number // Kelvin
   orbitalPeriod?: number // days
   g_fraction?: number
@@ -118,16 +120,11 @@ export function calculateGravityFraction(gravity: number): number {
   return gravity / 9.81
 }
 
-// Convert gravity fraction to Intensity Index (1-10 scale)
+// Convert gravity fraction to Intensity Index (1-10 scale).
+// Delegates to the canonical formula so this agrees with the intensity_index
+// values shipped in the dataset and with /api/predict.
 export function calculateIntensityIndex(gravityFraction: number): number {
-  // Scale: 0-0.5g = 1-3, 0.5-1.5g = 4-7, 1.5g+ = 8-10
-  if (gravityFraction <= 0.5) {
-    return Math.max(1, Math.round(gravityFraction * 6))
-  } else if (gravityFraction <= 1.5) {
-    return Math.round(3 + (gravityFraction - 0.5) * 4)
-  } else {
-    return Math.min(10, Math.round(7 + (gravityFraction - 1.5) * 2))
-  }
+  return canonicalIntensityIndex(gravityFraction)
 }
 
 // Get intensity tier for visualization

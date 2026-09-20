@@ -56,12 +56,13 @@ NASA Exoplanet Archive (33,000+ rows)
 
 | Layer | Technology |
 |:---|:---|
-| **Frontend** | Next.js 14, TypeScript, Tailwind CSS |
-| **Backend** | FastAPI, Python 3.12 |
-| **Data** | NASA Exoplanet Archive (pandas, NumPy, scikit-learn) |
-| **ML** | Linear regression, TensorFlow |
-| **Deployment** | Vercel (frontend) + Render/Railway (backend) |
-| **Package Manager** | pnpm |
+| **Frontend** | Next.js 14 (App Router), TypeScript, Tailwind CSS |
+| **API** | Next.js route handlers (deployed as Vercel serverless functions) |
+| **Reference backend** | FastAPI, Python 3.12 — same logic, used for local development |
+| **Data** | NASA Exoplanet Archive, prepared with pandas + NumPy |
+| **Model** | Closed-form gravity → intensity mapping (see *How It Works*) |
+| **Deployment** | Vercel (single deployment: UI + API) |
+| **Package Manager** | npm |
 
 ---
 
@@ -90,12 +91,16 @@ CDC-2025-Planetary_Systems/
 
 ## 🔌 API Reference
 
-### `GET /health`
-```json
-{ "ok": true }
-```
+The deployed app serves these from Next.js route handlers under `/api`
+(`frontend/app/api/*`). The FastAPI backend in `backend/` exposes the same
+contract at the path root (`/predict`, `/plan`) for local development; point the
+frontend at it with `NEXT_PUBLIC_API_BASE=http://localhost:8000`.
 
-### `POST /predict`
+Both sides share one implementation of the maths — `frontend/lib/gravity-fitness.ts`
+is a direct port of `backend/app/services/`, and the client falls back to it
+in-process if a request fails, so the UI always renders a plan.
+
+### `POST /api/predict`
 Computes the intensity index from a planet's gravity fraction.
 ```json
 // Request
@@ -103,27 +108,37 @@ Computes the intensity index from a planet's gravity fraction.
 
 // Response
 {
-  "intensity_index": 7,
-  "details": { "g_fraction": 0.42, "mapping": "nonlinear", "alpha": 1.0 }
+  "intensity_index": 6,
+  "details": {
+    "g_fraction": 0.42,
+    "alpha_used": 1.0,
+    "mapping": "nonlinear",
+    "formula": "I = round(1 + 9 * (1 - g_fraction^1))"
+  }
 }
 ```
 
-### `POST /plan`
+### `POST /api/plan`
 Generates a full 7-day gravity-scaled workout plan.
 ```json
 // Request
-{ "intensity_index": 7, "g_fraction": 0.42 }
+{ "intensity_index": 6, "g_fraction": 0.42 }
 
 // Response
 {
-  "plan": [
-    {
-      "day": 1,
-      "exercises": [...],
-      "device_setpoints": {...},
-      "safety_notes": "..."
-    }
+  "intensity_index": 6,
+  "g_fraction": 0.42,
+  "total_weekly_volume": 238,
+  "sessions": [
+    { "day": 1, "name": "Day 1: Full Body Strength", "duration": 34, "exercises": [...] }
     // ...7 days
+  ],
+  "device_setpoints": [
+    { "exercise": "Squats", "setpoint": 34, "base_load": 60, "scaled_load": 34 }
+  ],
+  "safety_notes": [
+    "Low gravity: Focus on resistance training to maintain bone density",
+    "Increase repetitions to compensate for reduced load"
   ]
 }
 ```
@@ -207,7 +222,7 @@ NEXT_PUBLIC_API_BASE=http://localhost:8000
 
 **Frontend → Vercel**
 - Root directory: `frontend`
-- Build command: `pnpm build`
+- Build command: `npm run build`
 - Env: `NEXT_PUBLIC_API_BASE=https://your-backend.onrender.com`
 
 **Backend → Render / Railway**

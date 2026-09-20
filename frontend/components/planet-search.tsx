@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Globe, Zap, Calendar, Thermometer, Loader2 } from "lucide-react"
+import { Search, Globe, Zap, Orbit, Thermometer, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,7 +16,16 @@ import {
 import { searchExoplanets as searchExoplanetsAPI, getRandomExoplanets, getExoplanetStats } from "@/lib/exoplanet-service"
 import { ExoplanetStatsResponse, api } from "@/lib/api"
 
-export function PlanetSearch() {
+interface PlanetSearchProps {
+  /**
+   * Bumped by the page when the header's "Planet Search" is clicked, so an open
+   * workout closes and the planet list comes back. Kept separate from the
+   * loaded planets and the query so neither is thrown away.
+   */
+  resetToken?: number
+}
+
+export function PlanetSearch({ resetToken = 0 }: PlanetSearchProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedPlanet, setSelectedPlanet] = useState<Exoplanet | null>(null)
   const [showWorkout, setShowWorkout] = useState(false)
@@ -51,7 +60,6 @@ export function PlanetSearch() {
           radius: planet.pl_rade,
           gravity: planet.g_fraction * 9.81, // Convert to m/s²
           distance: planet.sy_dist ? planet.sy_dist * 3.26 : 0, // Convert parsecs to light years
-          discoveryYear: 2020, // Default since not in CSV
           temperature: planet.pl_eqt,
           orbitalPeriod: planet.pl_orbper,
           g_fraction: planet.g_fraction,
@@ -89,8 +97,7 @@ export function PlanetSearch() {
             radius: planet.pl_rade,
             gravity: planet.g_fraction * 9.81,
             distance: planet.sy_dist ? planet.sy_dist * 3.26 : 0,
-            discoveryYear: 2020,
-            temperature: planet.pl_eqt,
+              temperature: planet.pl_eqt,
             orbitalPeriod: planet.pl_orbper,
             g_fraction: planet.g_fraction,
             intensity_index: planet.intensity_index,
@@ -115,7 +122,6 @@ export function PlanetSearch() {
           radius: planet.pl_rade,
           gravity: planet.g_fraction * 9.81,
           distance: planet.sy_dist ? planet.sy_dist * 3.26 : 0,
-          discoveryYear: 2020,
           temperature: planet.pl_eqt,
           orbitalPeriod: planet.pl_orbper,
           g_fraction: planet.g_fraction,
@@ -149,6 +155,12 @@ export function PlanetSearch() {
     setShowWorkout(false)
     setSelectedPlanet(null)
   }
+
+  useEffect(() => {
+    if (resetToken === 0) return
+    setShowWorkout(false)
+    setSelectedPlanet(null)
+  }, [resetToken])
 
   if (showWorkout && selectedPlanet) {
     return <WorkoutGenerator planet={selectedPlanet} onBack={handleBackToSearch} />
@@ -251,8 +263,8 @@ export function PlanetSearch() {
                     {/* Additional Info */}
                     <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        <span>{planet.discoveryYear ?? 'N/A'}</span>
+                        <Orbit className="h-3 w-3" />
+                        <span>{planet.orbitalPeriod ? `${planet.orbitalPeriod.toFixed(1)} d` : "Unknown"}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Thermometer className="h-3 w-3" />
